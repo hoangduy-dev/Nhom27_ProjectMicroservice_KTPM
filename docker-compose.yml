@@ -1,0 +1,108 @@
+version: "3.8"
+
+services:
+  mysqldb:
+    image: mysql:8.0
+    restart: unless-stopped
+    env_file: ./.env
+    environment:
+    - MYSQL_ROOT_USER:$MYSQL_ROOT_USER
+    - MYSQL_ROOT_PASSWORD:$MYSQL_ROOT_PASSWORD
+    - MYSQL_DATABASE:$MYSQLDB_DATABASE
+    - MYSQL_ROOT_HOST:localhost
+    ports:
+    - $MYSQLDB_LOCAL_PORT:$MYSQLDB_DOCKER_PORT
+  eureka:
+    depends_on:
+    - mysqldb
+    build: 
+      context: ./PhoneUp_EurekaServer
+      dockerfile: Dockerfile
+    restart: on-failure
+    ports:
+    - 8761:8761
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.application.name": "eureka-server",
+        "server.port": 8761,
+        "eureka.client.register-with-eureka": "false",
+        "eureka.client.fetch-registry": "false"
+       }'
+  phone:
+    depends_on:
+    - eureka
+    build: 
+      context: ./PhoneUp_PhoneService
+      dockerfile: Dockerfile
+    restart: on-failure
+    env_file: ./.env
+    ports:
+    - 8801:$SPRING_DOCKER_PORT
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.datasource.url"  : "jdbc:mysql://mysqldb:$MYSQLDB_DOCKER_PORT/$MYSQLDB_DATABASE?createDatabaseIfNotExist=true&&useSSL=false&allowPublicKeyRetrieval=true",
+        "spring.datasource.username" : "$MYSQL_ROOT_USER",
+        "spring.datasource.password" : "$MYSQL_ROOT_PASSWORD",
+        "spring.jpa.properties.hibernate.dialect" : "org.hibernate.dialect.MySQL5InnoDBDialect",
+        "spring.jpa.hibernate.ddl-auto" : "update",
+        "spring.jpa.show-sql": "true",
+        "spring.application.name": "phone-service",
+        "eureka.client.service-url.defaultZone": "http://localhost:8761/eureka",
+        "server.port":8802
+        }'
+  brand:
+    depends_on:
+    - eureka
+    build: 
+      context: ./PhoneUp_BrandService
+      dockerfile: Dockerfile
+    restart: on-failure
+    env_file: ./.env
+    ports:
+    - 8802:$SPRING_DOCKER_PORT
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.datasource.url"  : "jdbc:mysql://mysqldb:$MYSQLDB_DOCKER_PORT/$MYSQLDB_DATABASE?createDatabaseIfNotExist=true&&useSSL=false&allowPublicKeyRetrieval=true",
+        "spring.datasource.username" : "$MYSQL_ROOT_USER",
+        "spring.datasource.password" : "$MYSQL_ROOT_PASSWORD",
+        "spring.jpa.properties.hibernate.dialect" : "org.hibernate.dialect.MySQL5InnoDBDialect",
+        "spring.jpa.hibernate.ddl-auto" : "update",
+        "spring.jpa.show-sql": "true",
+        "spring.application.name": "brand-service",
+        "eureka.client.service-url.defaultZone": "http://localhost:8761/eureka",
+        "server.port":8802
+        }'
+  jwt:
+    depends_on:
+    - eureka
+    build: 
+      context: ./PhoneUp_AuthService
+      dockerfile: Dockerfile
+    restart: on-failure
+    env_file: ./.env
+    ports:
+    - 8803:$SPRING_DOCKER_PORT
+    environment:
+      SPRING_APPLICATION_JSON: '{
+        "spring.datasource.url"  : "jdbc:mysql://mysqldb:$MYSQLDB_DOCKER_PORT/$MYSQLDB_DATABASE?createDatabaseIfNotExist=true&&useSSL=false&allowPublicKeyRetrieval=true",
+        "spring.datasource.username" : "$MYSQL_ROOT_USER",
+        "spring.datasource.password" : "$MYSQL_ROOT_PASSWORD",
+        "spring.jpa.properties.hibernate.dialect" : "org.hibernate.dialect.MySQL5InnoDBDialect",
+        "spring.jpa.hibernate.ddl-auto" : "update",
+        "spring.jpa.show-sql": "true",
+        "spring.application.name": "auth-service",
+        "eureka.client.service-url.defaultZone": "http://localhost:8761/eureka",
+        "server.port":8803
+        }'
+  gateway:
+    depends_on:
+    - eureka
+    build: 
+      context: ./PhoneUp_GatewayService
+      dockerfile: Dockerfile
+    restart: on-failure
+    env_file: ./.env
+    ports:
+    - 8080:$SPRING_DOCKER_PORT
+volumes:
+  mysqldb:
